@@ -12,6 +12,7 @@ import random
 import numpy as np
 import time
 import datetime
+from itertools import groupby
 
 import loss
 
@@ -41,157 +42,19 @@ def minimal(a, b):
 def cmp_list(a, b):
 	return (minimal(a.h, a.t) > minimal(b.h, b.t))
 
+# Write a list of Triples into a file, with three numbers (head tail relation) per line
+def process_list(tripleList, dataset, filename):
+    with open(os.path.join('./datasets/', dataset, filename), 'w') as fw:
+        fw.write(str(len(tripleList)) + '\n')
+        for triple in tripleList:
+            fw.write(str(triple.h) + '\t' + str(triple.t) + '\t' + str(triple.r) + '\n')
+
 emptyTriple = Triple(0, 0, 0)
-
-# Calculate the statistics of datasets
-def calculate(datasetPath):
-	with open(os.path.join(datasetPath, 'relation2id.txt'), 'r') as fr:
-		for line in fr:
-			relationTotal = int(line)
-			break
-
-	freqRel = [0] * relationTotal # The frequency of each relation
-
-	with open(os.path.join(datasetPath, 'entity2id.txt'), 'r') as fr:
-		for line in fr:
-			entityTotal = int(line)
-			break
-
-	freqEnt = [0] * entityTotal # The frequency of each entity
-
-	tripleHead = []
-	tripleTail = []
-	tripleList = []
-
-	tripleTotal = 0
-	with open(os.path.join(datasetPath, 'train2id.txt'), 'r') as fr:
-		i = 0
-		for line in fr:
-			# Ignore the first line, which is the number of triples
-			if i == 0:
-				i += 1
-				continue
-			else:
-				line_split = line.split()
-				head = int(line_split[0])
-				tail = int(line_split[1])
-				rel = int(line_split[2])
-				tripleHead.append(Triple(head, tail, rel))
-				tripleTail.append(Triple(head, tail, rel))
-				tripleList.append(Triple(head, tail, rel))
-				freqEnt[head] += 1
-				freqEnt[tail] += 1
-				freqRel[rel] += 1
-				tripleTotal += 1
-
-	with open(os.path.join(datasetPath, 'valid2id.txt'), 'r') as fr:
-		i = 0
-		for line in fr:
-			if i == 0:
-				i += 1
-				continue
-			else:
-				line_split = line.split()
-				head = int(line_split[0])
-				tail = int(line_split[1])
-				rel = int(line_split[2])
-				tripleHead.append(Triple(head, tail, rel))
-				tripleTail.append(Triple(head, tail, rel))
-				tripleList.append(Triple(head, tail, rel))
-				freqEnt[head] += 1
-				freqEnt[tail] += 1
-				freqRel[rel] += 1
-				tripleTotal += 1
-
-	with open(os.path.join(datasetPath, 'test2id.txt'), 'r') as fr:
-		i = 0
-		for line in fr:
-			if i == 0:
-				i += 1
-				continue
-			else:
-				line_split = line.split()
-				head = int(line_split[0])
-				tail = int(line_split[1])
-				rel = int(line_split[2])
-				tripleHead.append(Triple(head, tail, rel))
-				tripleTail.append(Triple(head, tail, rel))
-				tripleList.append(Triple(head, tail, rel))
-				freqEnt[head] += 1
-				freqEnt[tail] += 1
-				freqRel[rel] += 1
-				tripleTotal += 1
-
-	tripleHead.sort(key=lambda x: (x.h, x.r, x.t))
-	tripleTail.sort(key=lambda x: (x.t, x.r, x.h))
-
-	headDict = {}
-	tailDict = {}
-	for triple in tripleList:
-		if triple.r not in headDict:
-			headDict[triple.r] = {}
-			tailDict[triple.r] = {}
-			headDict[triple.r][triple.h] = set([triple.t])
-			tailDict[triple.r][triple.t] = set([triple.h])
-		else:
-			if triple.h not in headDict[triple.r]:
-				headDict[triple.r][triple.h] = set([triple.t])
-			else:
-				headDict[triple.r][triple.h].add(triple.t)
-
-			if triple.t not in tailDict[triple.r]:
-				tailDict[triple.r][triple.t] = set([triple.h])
-			else:
-				tailDict[triple.r][triple.t].add(triple.h)
-
-	tail_per_head = [0] * relationTotal
-	head_per_tail = [0] * relationTotal
-
-	for rel in headDict:
-		heads = headDict[rel].keys()
-		tails = headDict[rel].values()
-		totalHeads = len(heads)
-		totalTails = sum([len(elem) for elem in tails])
-		tail_per_head[rel] = totalTails / totalHeads
-
-	for rel in tailDict:
-		tails = tailDict[rel].keys()
-		heads = tailDict[rel].values()
-		totalTails = len(tails)
-		totalHeads = sum([len(elem) for elem in heads])
-		head_per_tail[rel] = totalHeads / totalTails
-
-	connectedTailDict = {}
-	for rel in headDict:
-		if rel not in connectedTailDict:
-			connectedTailDict[rel] = set()
-		for head in headDict[rel]:
-			connectedTailDict[rel] = connectedTailDict[rel].union(headDict[rel][head])
-
-	connectedHeadDict = {}
-	for rel in tailDict:
-		if rel not in connectedHeadDict:
-			connectedHeadDict[rel] = set()
-		for tail in tailDict[rel]:
-			connectedHeadDict[rel] = connectedHeadDict[rel].union(tailDict[rel][tail])
-
-	print(tail_per_head)
-	print(head_per_tail)
-
-	listTripleHead = [(triple.h, triple.t, triple.r) for triple in tripleHead]
-	listTripleTail = [(triple.h, triple.t, triple.r) for triple in tripleTail]
-	listTripleList = [(triple.h, triple.t, triple.r) for triple in tripleList]
-	with open(os.path.join(datasetPath, 'head_tail_proportion.pkl'), 'wb') as fw:
-		pickle.dump(tail_per_head, fw)
-		pickle.dump(head_per_tail, fw)
-
-	with open(os.path.join(datasetPath, 'head_tail_connection.pkl'), 'wb') as fw:
-		pickle.dump(connectedTailDict, fw)
-		pickle.dump(connectedHeadDict, fw)
 
 def getRel(triple):
     return triple.r
 
+# Gets the number of entities/relations/triples
 def getAnythingTotal(inPath, fileName):
 	with open(os.path.join(inPath, fileName), 'r') as fr:
 		for line in fr:
@@ -217,6 +80,76 @@ def loadTriple(inPath, fileName):
 		tripleDict[(triple.h, triple.t, triple.r)] = True
 
 	return tripleTotal, tripleList, tripleDict
+
+# Calculate the statistics of datasets
+def calculate_one_or_many(dataset):
+	tripleTotal, tripleList, tripleDict = loadTriple('./datasets/' + dataset, 'triple2id.txt')
+	# You should sort first before groupby!
+	tripleList.sort(key=lambda x: (x.r, x.h, x.t))
+	grouped = [(k, list(g)) for k, g in groupby(tripleList, key=getRel)]
+	num_of_relations = len(grouped)
+	head_per_tail_list = [0] * num_of_relations
+	tail_per_head_list = [0] * num_of_relations
+
+	one_to_one = []
+	one_to_many = []
+	many_to_one = []
+	many_to_many = []
+
+	for elem in grouped:
+	    headList = []
+	    tailList = []
+	    for triple in elem[1]:
+	        headList.append(triple.h)
+	        tailList.append(triple.t)
+	    headSet = set(headList)
+	    tailSet = set(tailList)
+	    head_per_tail = len(headList) / len(tailSet)
+	    tail_per_head = len(tailList) / len(headSet)
+	    head_per_tail_list[elem[0]] = head_per_tail
+	    tail_per_head_list[elem[0]] = tail_per_head
+	    if head_per_tail < 1.5 and tail_per_head < 1.5:
+	        one_to_one.append(elem[0])
+	    elif head_per_tail >= 1.5 and tail_per_head < 1.5:
+	        many_to_one.append(elem[0])
+	    elif head_per_tail < 1.5 and tail_per_head >= 1.5:
+	        one_to_many.append(elem[0])
+	    else:
+	        many_to_many.append(elem[0])
+
+	# Classify test triples according to the type of relation
+	testTotal, testList, testDict = loadTriple('./datasets/' + dataset, 'test2id.txt')
+	testList.sort(key=lambda x: (x.r, x.h, x.t))
+	test_grouped = [(k, list(g)) for k, g in groupby(testList, key=getRel)]
+
+	one_to_one_list = []
+	one_to_many_list = []
+	many_to_one_list = []
+	many_to_many_list = []
+
+	for elem in test_grouped:
+	    if elem[0] in one_to_one:
+	        one_to_one_list.append(elem[1])
+	    elif elem[0] in one_to_many:
+	        one_to_many_list.append(elem[1])
+	    elif elem[0] in many_to_one:
+	        many_to_one_list.append(elem[1])
+	    else:
+	        many_to_many_list.append(elem[1])
+
+	one_to_one_list = [x for j in one_to_one_list for x in j]
+	one_to_many_list = [x for j in one_to_many_list for x in j]
+	many_to_one_list = [x for j in many_to_one_list for x in j]
+	many_to_many_list = [x for j in many_to_many_list for x in j]
+
+	process_list(one_to_one_list, dataset, 'one_to_one_test.txt')
+	process_list(one_to_many_list, dataset, 'one_to_many_test.txt')
+	process_list(many_to_one_list, dataset, 'many_to_one_test.txt')
+	process_list(many_to_many_list, dataset, 'many_to_many_test.txt')
+
+	with open(os.path.join('./datasets/', dataset, 'head_tail_proportion.pkl'), 'wb') as fw:
+		pickle.dump(tail_per_head_list, fw)
+		pickle.dump(head_per_tail_list, fw)
 
 def which_loss_type(num):
 	if num == 0:
