@@ -301,7 +301,7 @@ if __name__ == "__main__":
 				#if USE_CUDA:
 					#model.cuda()
 
-			# Check the result on validation set for every 5 epochs
+			# Evaluate on validation set for every 5 epochs
 			elif epoch % 5 == 0:
 				ent_embeddings = model.ent_embeddings.weight.data.cpu().numpy()
 				rel_embeddings = model.rel_embeddings.weight.data.cpu().numpy()
