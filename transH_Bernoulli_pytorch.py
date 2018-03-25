@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# @Date    : 2018-01-07 01:05:44
+# @Date    : 2018-01-07 01:00:31
 # @Author  : jimmy (jimmywangheng@qq.com)
 # @Link    : http://sdcs.sysu.edu.cn
 # @Version : $Id$
@@ -27,14 +27,6 @@ import model
 from hyperboard import Agent
 
 USE_CUDA = torch.cuda.is_available()
-
-if USE_CUDA:
-	longTensor = torch.cuda.LongTensor
-	floatTensor = torch.cuda.FloatTensor
-
-else:
-	longTensor = torch.LongTensor
-	floatTensor = torch.FloatTensor
 
 """
 The meaning of parameters:
@@ -150,6 +142,10 @@ if __name__ == "__main__":
 
 	if args.loss_type == 0:
 		config.loss_function = loss.marginLoss
+	elif args.loss_type == 1:
+		config.loss_function = loss.EMLoss
+	elif args.loss_type == 2:
+		config.loss_function = loss.WGANLoss
 
 	config.entity_total = getAnythingTotal('./data/' + config.dataset, 'entity2id.txt')
 	config.relation_total = getAnythingTotal('./data/' + config.dataset, 'relation2id.txt')
@@ -186,11 +182,17 @@ if __name__ == "__main__":
 	meanrankCurve = agent.register(meanrankHyperparameters, 'mean rank', overwrite=True)
 
 	loss_function = config.loss_function()
-	model = model.TransEModel(config)
+	model = model.TransHModel(config)
 
 	if USE_CUDA:
 		model.cuda()
 		loss_function.cuda()
+		longTensor = torch.cuda.LongTensor
+		floatTensor = torch.cuda.FloatTensor
+
+	else:
+		longTensor = torch.LongTensor
+		floatTensor = torch.FloatTensor
 
 	optimizer = config.optimizer(model.parameters(), lr=config.learning_rate)
 	margin = autograd.Variable(floatTensor([config.margin]))
@@ -209,7 +211,7 @@ if __name__ == "__main__":
 		 'mo', str(args.momentum),
 		 's', str(args.seed),
 		 'op', str(args.optimizer),
-		 'lo', str(args.loss_type),]) + '_TransE_Bernoulli.ckpt'
+		 'lo', str(args.loss_type),]) + '_TransH_Bernoulli.ckpt'
 
 	trainBatchList = getBatchList(trainList, config.num_batches)
 
@@ -245,11 +247,16 @@ if __name__ == "__main__":
 				losses = loss_function(pos, neg)
 			ent_embeddings = model.ent_embeddings(torch.cat([pos_h_batch, pos_t_batch, neg_h_batch, neg_t_batch]))
 			rel_embeddings = model.rel_embeddings(torch.cat([pos_r_batch, neg_r_batch]))
+			norm_embeddings = model.norm_embeddings(torch.cat([pos_r_batch, neg_r_batch]))
+			losses += loss.orthogonalLoss(rel_embeddings, norm_embeddings)
 			losses = losses + loss.normLoss(ent_embeddings) + loss.normLoss(rel_embeddings)
-
+			
 			losses.backward()
 			optimizer.step()
 			total_loss += losses.data
+
+			normalize_norm_emb = F.normalize(model.norm_embeddings.weight.data[longTensor(batch_relation_list)], p=2, dim=1)
+			model.norm_embeddings.weight.data[longTensor(batch_relation_list)] = normalize_norm_emb
 
 		agent.append(trainCurve, epoch, total_loss[0])
 
@@ -280,18 +287,22 @@ if __name__ == "__main__":
 				losses = loss_function(pos, neg)
 			ent_embeddings = model.ent_embeddings(torch.cat([pos_h_batch, pos_t_batch, neg_h_batch, neg_t_batch]))
 			rel_embeddings = model.rel_embeddings(torch.cat([pos_r_batch, neg_r_batch]))
+			norm_embeddings = model.norm_embeddings(torch.cat([pos_r_batch, neg_r_batch]))
+			losses += loss.orthogonalLoss(rel_embeddings, norm_embeddings)
 			losses = losses + loss.normLoss(ent_embeddings) + loss.normLoss(rel_embeddings)
+
 			print("Valid batch loss: %d %f" % (epoch, losses.data[0]))
 			agent.append(validCurve, epoch, losses.data[0])
 
 		if config.early_stopping_round > 0:
 			if epoch == 0:
-				ent_embeddings = model.ent_embeddings.weight.data.cpu().numpy()
-				rel_embeddings = model.rel_embeddings.weight.data.cpu().numpy()
+				ent_embeddings = model.ent_embeddings.weight.data
+				rel_embeddings = model.rel_embeddings.weight.data
+				norm_embeddings = model.norm_embeddings.weight.data
 				L1_flag = model.L1_flag
 				filter = model.filter	
-				hit10, best_meanrank = evaluation_transE(validList, tripleDict, ent_embeddings, rel_embeddings, 
-					L1_flag, filter, config.batch_size, num_processes=args.num_processes)
+				hit10, best_meanrank = evaluation_transH(validList, tripleDict, ent_embeddings, rel_embeddings, 
+					norm_embeddings, L1_flag, filter, k=config.batch_size, num_processes=args.num_processes)
 				agent.append(hit10Curve, epoch, hit10)
 				agent.append(meanrankCurve, epoch, best_meanrank)
 				torch.save(model, os.path.join('./model/' + args.dataset, filename))	
@@ -303,12 +314,13 @@ if __name__ == "__main__":
 
 			# Check the result on validation set for every 5 epochs
 			elif epoch % 5 == 0:
-				ent_embeddings = model.ent_embeddings.weight.data.cpu().numpy()
-				rel_embeddings = model.rel_embeddings.weight.data.cpu().numpy()
+				ent_embeddings = model.ent_embeddings.weight.data
+				rel_embeddings = model.rel_embeddings.weight.data
+				norm_embeddings = model.norm_embeddings.weight.data
 				L1_flag = model.L1_flag
 				filter = model.filter
-				hit10, now_meanrank = evaluation_transE(validList, tripleDict, ent_embeddings, rel_embeddings, 
-					L1_flag, filter, config.batch_size, num_processes=args.num_processes)
+				hit10, now_meanrank = evaluation_transH(validList, tripleDict, ent_embeddings, rel_embeddings, 
+					norm_embeddings, L1_flag, filter, k=config.batch_size, num_processes=args.num_processes)
 				agent.append(hit10Curve, epoch, hit10)
 				agent.append(meanrankCurve, epoch, now_meanrank)
 				if now_meanrank < best_meanrank:
@@ -331,28 +343,30 @@ if __name__ == "__main__":
 		elif (epoch + 1) % 10 == 0 or epoch == 0:
 			torch.save(model, os.path.join('./model/' + args.dataset, filename))
 
+
 	testTotal, testList, testDict = loadTriple('./data/' + args.dataset, 'test2id.txt')
 	oneToOneTotal, oneToOneList, oneToOneDict = loadTriple('./data/' + args.dataset, 'one_to_one.txt')
 	oneToManyTotal, oneToManyList, oneToManyDict = loadTriple('./data/' + args.dataset, 'one_to_many.txt')
 	manyToOneTotal, manyToOneList, manyToOneDict = loadTriple('./data/' + args.dataset, 'many_to_one.txt')
 	manyToManyTotal, manyToManyList, manyToManyDict = loadTriple('./data/' + args.dataset, 'many_to_many.txt')
 	
-	ent_embeddings = model.ent_embeddings.weight.data.cpu().numpy()
-	rel_embeddings = model.rel_embeddings.weight.data.cpu().numpy()
+	ent_embeddings = model.ent_embeddings.weight.data
+	rel_embeddings = model.rel_embeddings.weight.data
+	norm_embeddings = model.norm_embeddings.weight.data
 	L1_flag = model.L1_flag
 	filter = model.filter
 
-	hit10Test, meanrankTest = evaluation_transE(testList, tripleDict, ent_embeddings, rel_embeddings, L1_flag, filter, head=0)
+	hit10Test, meanrankTest = evaluation_transH(testList, tripleDict, ent_embeddings, rel_embeddings, norm_embeddings, L1_flag, filter, head=0)
 
-	hit10OneToOneHead, meanrankOneToOneHead = evaluation_transE(oneToOneList, tripleDict, ent_embeddings, rel_embeddings, L1_flag, filter, head=1)
-	hit10OneToManyHead, meanrankOneToManyHead = evaluation_transE(oneToManyList, tripleDict, ent_embeddings, rel_embeddings, L1_flag, filter, head=1)
-	hit10ManyToOneHead, meanrankManyToOneHead = evaluation_transE(manyToOneList, tripleDict, ent_embeddings, rel_embeddings, L1_flag, filter, head=1)
-	hit10ManyToManyHead, meanrankManyToManyHead = evaluation_transE(manyToManyList, tripleDict, ent_embeddings, rel_embeddings, L1_flag, filter, head=1)
+	hit10OneToOneHead, meanrankOneToOneHead = evaluation_transH(oneToOneList, tripleDict, ent_embeddings, rel_embeddings, norm_embeddings, L1_flag, filter, head=1)
+	hit10OneToManyHead, meanrankOneToManyHead = evaluation_transH(oneToManyList, tripleDict, ent_embeddings, rel_embeddings, norm_embeddings, L1_flag, filter, head=1)
+	hit10ManyToOneHead, meanrankManyToOneHead = evaluation_transH(manyToOneList, tripleDict, ent_embeddings, rel_embeddings, norm_embeddings, L1_flag, filter, head=1)
+	hit10ManyToManyHead, meanrankManyToManyHead = evaluation_transH(manyToManyList, tripleDict, ent_embeddings, rel_embeddings, norm_embeddings, L1_flag, filter, head=1)
 
-	hit10OneToOneTail, meanrankOneToOneTail = evaluation_transE(oneToOneList, tripleDict, ent_embeddings, rel_embeddings, L1_flag, filter, head=2)
-	hit10OneToManyTail, meanrankOneToManyTail = evaluation_transE(oneToManyList, tripleDict, ent_embeddings, rel_embeddings, L1_flag, filter, head=2)
-	hit10ManyToOneTail, meanrankManyToOneTail = evaluation_transE(manyToOneList, tripleDict, ent_embeddings, rel_embeddings, L1_flag, filter, head=2)
-	hit10ManyToManyTail, meanrankManyToManyTail = evaluation_transE(manyToManyList, tripleDict, ent_embeddings, rel_embeddings, L1_flag, filter, head=2)	
+	hit10OneToOneTail, meanrankOneToOneTail = evaluation_transH(oneToOneList, tripleDict, ent_embeddings, rel_embeddings, norm_embeddings, L1_flag, filter, head=2)
+	hit10OneToManyTail, meanrankOneToManyTail = evaluation_transH(oneToManyList, tripleDict, ent_embeddings, rel_embeddings, norm_embeddings, L1_flag, filter, head=2)
+	hit10ManyToOneTail, meanrankManyToOneTail = evaluation_transH(manyToOneList, tripleDict, ent_embeddings, rel_embeddings, norm_embeddings, L1_flag, filter, head=2)
+	hit10ManyToManyTail, meanrankManyToManyTail = evaluation_transH(manyToManyList, tripleDict, ent_embeddings, rel_embeddings, norm_embeddings, L1_flag, filter, head=2)	
 
 	writeList = [filename, 
 		'testSet', '%.6f' % hit10Test, '%.6f' % meanrankTest, 
