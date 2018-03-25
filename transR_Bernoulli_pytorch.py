@@ -118,11 +118,6 @@ if __name__ == "__main__":
 	validTotal, validList, validDict = loadTriple('./data/' + args.dataset, 'valid2id.txt')
 	tripleTotal, tripleList, tripleDict = loadTriple('./data/' + args.dataset, 'triple2id.txt')
 	with open(os.path.join('./data/', args.dataset, 'head_tail_proportion.pkl'), 'rb') as fr:
-		"""
-		tail_per_head = pickle.load(fr)
-		head_per_tail = pickle.load(fr)
-		"""
-
 		head_per_tail = pickle.load(fr)
 		tail_per_head = pickle.load(fr)
 

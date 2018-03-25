@@ -142,10 +142,6 @@ if __name__ == "__main__":
 
 	if args.loss_type == 0:
 		config.loss_function = loss.marginLoss
-	elif args.loss_type == 1:
-		config.loss_function = loss.EMLoss
-	elif args.loss_type == 2:
-		config.loss_function = loss.WGANLoss
 
 	config.entity_total = getAnythingTotal('./data/' + config.dataset, 'entity2id.txt')
 	config.relation_total = getAnythingTotal('./data/' + config.dataset, 'relation2id.txt')
