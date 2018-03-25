@@ -30,25 +30,6 @@ class marginLoss(nn.Module):
 		zero_tensor = autograd.Variable(zero_tensor)
 		return torch.sum(torch.max(pos - neg + margin, zero_tensor))
 
-class EMLoss(nn.Module):
-	def __init__(self):
-		super(EMLoss, self).__init__()
-
-	def forward(self, pos, neg):
-		return (torch.mean(pos) - torch.mean(neg))
-
-class WGANLoss(nn.Module):
-	def __init__(self):
-		super(WGANLoss, self).__init__()
-
-	def forward(self, pos, neg):
-		delta = autograd.Variable(floatTensor(pos.size()))
-		delta[0] = autograd.Variable(floatTensor([0])) + pos[0] - neg[0]
-		for i in range(1, pos.size()[0]):
-			delta[i] = delta[i - 1] + pos[i] - neg[i]
-		loss = torch.sum(torch.abs(delta))
-		return loss
-
 def orthogonalLoss(rel_embeddings, norm_embeddings):
 	return torch.sum(torch.sum(norm_embeddings * rel_embeddings, dim=1, keepdim=True) ** 2 / torch.sum(rel_embeddings ** 2, dim=1, keepdim=True))
 
