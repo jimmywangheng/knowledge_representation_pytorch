@@ -66,6 +66,10 @@ Possible parameters includes:
 Evaluation result on the test set will be written into ./result/[dataset].txt, such as ./result/FB15k.txt. It consists of Hits@10 and MeanRank on the whole test set, as well as Hits@10 and MeanRank on 1-1, 1-N, N-1, N-N subsets, when predicting head and tail, respectively.
 
 
+## Appendices
 
+I'm finding internship recently. If interested, you can contact me by email: wangh376@mail2.sysu.edu.cn
+
+最近正在找实习，感兴趣的可联系我：wangh376@mail2.sysu.edu.cn
 
 
