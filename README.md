@@ -1,4 +1,4 @@
-# Knowledge Representation Pytorch
+# Knowledge Graph Representation Pytorch
 
 ## Introduction
 
