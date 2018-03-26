@@ -362,8 +362,6 @@ if __name__ == "__main__":
 		elif (epoch + 1) % 10 == 0 or epoch == 0:
 			torch.save(model, os.path.join('./model/' + args.dataset, filename))
 
-
-
 	testTotal, testList, testDict = loadTriple('./data/' + args.dataset, 'test2id.txt')
 	oneToOneTotal, oneToOneList, oneToOneDict = loadTriple('./data/' + args.dataset, 'one_to_one.txt')
 	oneToManyTotal, oneToManyList, oneToManyDict = loadTriple('./data/' + args.dataset, 'one_to_many.txt')
