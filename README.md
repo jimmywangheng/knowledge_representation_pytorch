@@ -68,7 +68,7 @@ Evaluation result on the test set will be written into ./result/[dataset].txt, s
 
 ## Appendices
 
-I'm finding internship recently. If interested, you can contact me by email: wangh376@mail2.sysu.edu.cn
+I'm finding an internship recently. If interested, you can contact me by email: wangh376@mail2.sysu.edu.cn
 
 最近正在找实习，感兴趣的可联系我：wangh376@mail2.sysu.edu.cn
 
